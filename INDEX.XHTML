@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>StoryTime — Read & Listen</title>
+<style>
+  :root{
+    --bg:#fff; --card:#fff; --muted:#666; --accent1:#ff6b6b; --accent2:#ffd93d;
+    --accent3:#6bcB77; --glass: rgba(255,255,255,0.75);
+  }
+  [data-theme="dark"]{
+    --bg:#0f1226; --card:#111226; --muted:#bfc6e0; --glass: rgba(255,255,255,0.03);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:linear-gradient(135deg,var(--accent3),#7bdff6 60%);
+    font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;
+    color:#111; min-height:100vh; padding:28px;
+    background-attachment: fixed;
+  }
+  header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{
+    width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--accent1),var(--accent2));
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px;box-shadow:0 8px 18px rgba(0,0,0,0.12)
+  }
+  h1{margin:0;font-size:20px}
+  .controls{display:flex;gap:8px;align-items:center}
+  .btn{padding:8px 12px;border-radius:10px;border:none;background:var(--card);box-shadow:0 6px 12px rgba(0,0,0,0.08);cursor:pointer}
+  .btn.primary{background:linear-gradient(90deg,var(--accent1),#ff8fa3);color:#fff}
+  .layout{display:grid;grid-template-columns:320px 1fr;gap:16px}
+  @media (max-width:880px){ .layout{grid-template-columns:1fr; } header{flex-direction:column;align-items:flex-start} }
+  .panel{background:var(--card);border-radius:14px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,0.08)}
+  .search{display:flex;gap:8px}
+  input[type="search"], select{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,0.06)}
+  .filters{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .story-list{margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto;padding-right:6px}
+  .story-item{display:flex;gap:8px;align-items:center;padding:8px;border-radius:10px;cursor:pointer}
+  .story-item:hover{background:linear-gradient(90deg,rgba(255,255,255,0.03),rgba(0,0,0,0.02))}
+  .story-avatar{width:56px;height:56px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+  .meta{flex:1}
+  .title{font-weight:700}
+  .small{font-size:12px;color:var(--muted)}
+  .badge{background:rgba(255,255,255,0.1);padding:4px 8px;border-radius:999px;font-size:12px}
+  /* Reader area */
+  .reader{display:flex;flex-direction:column;gap:12px}
+  .reader-top{display:flex;gap:12px;align-items:center;justify-content:space-between}
+  .reader-card{padding:18px;border-radius:14px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,0.02));box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
+  .story-text{line-height:1.8;padding:10px;border-radius:10px;max-height:52vh;overflow:auto}
+  .sentence{padding:2px 4px;border-radius:6px}
+  .sentence.highlight{background:linear-gradient(90deg,#fff6e6,#fffbe6);box-shadow:0 6px 18px rgba(255,191,0,0.12);transform:translateY(-2px)}
+  .player{display:flex;gap:8px;align-items:center}
+  .slider{width:140px}
+  .progress-wrap{display:flex;gap:8px;align-items:center}
+  .progress-bar{height:8px;background:rgba(0,0,0,0.08);border-radius:999px;flex:1;overflow:hidden}
+  .progress-bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent1),var(--accent2));width:0%}
+  .recommend{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{padding:6px 10px;border-radius:999px;background:linear-gradient(90deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02));font-weight:600}
+  footer{margin-top:18px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">ST</div>
+    <div>
+      <h1>StoryTime</h1>
+      <div class="small">Read along with synchronized narration — colorful & accessible</div>
+    </div>
+  </div>
+  <div class="controls">
+    <label class="small">Speed</label>
+    <input id="speed" class="slider" type="range" min="0.5" max="2" step="0.1" value="1" />
+    <label class="small">Volume</label>
+    <input id="volume" class="slider" type="range" min="0" max="1" step="0.05" value="1" />
+    <button id="themeToggle" title="Toggle dark" class="btn">Dark</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Left panel -->
+  <aside class="panel">
+    <div class="search">
+      <input id="q" type="search" placeholder="Search title or author..." />
+      <button id="clearSearch" class="btn">×</button>
+    </div>
+    <div class="filters">
+      <select id="genreFilter" style="min-width:130px">
+        <option value="">All genres</option>
+      </select>
+      <select id="authorFilter" style="min-width:130px">
+        <option value="">All authors</option>
+      </select>
+      <select id="sortBy">
+        <option value="pop">Sort: Popular</option>
+        <option value="title">Sort: Title</option>
+      </select>
+    </div>
+
+    <div class="story-list panel" id="storyList" style="margin-top:10px"></div>
+  </aside>
+
+  <!-- Right panel (reader) -->
+  <main class="panel reader">
+    <div class="reader-top">
+      <div>
+        <div id="storyHeader"><strong>Select a story to start</strong></div>
+        <div class="small" id="storyMeta"></div>
+      </div>
+      <div class="player">
+        <button id="playBtn" class="btn primary">Play ▶</button>
+        <button id="pauseBtn" class="btn">Pause ⏸</button>
+        <button id="stopBtn" class="btn">Stop ✖</button>
+        <button id="bookmarkBtn" class="btn">♡ Bookmark</button>
+      </div>
+    </div>
+
+    <div class="reader-card">
+      <div class="progress-wrap" style="margin-bottom:10px">
+        <div class="small">Progress</div>
+        <div class="progress-bar"><i id="progressFill"></i></div>
+        <div class="small" id="progressLabel">0%</div>
+      </div>
+
+      <div id="textArea" class="story-text small">Choose a story from the left. When narration plays the current sentence is highlighted.</div>
+    </div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <div class="btn" id="recoTitle">Recommended</div>
+      <div id="recommendations" class="recommend"></div>
+    </div>
+
+    <footer>Built with ❤️ — SpeechSynthesis used for narration. Bookmarks & progress saved locally in your browser.</footer>
+  </main>
+</div>
+
+<script>
+/* -------------------------
+   Sample stories dataset
+   ------------------------- */
+const stories = [
+  {
+    id: 's1', title: 'The Little Lantern', author: 'A. Rao', genre: 'Fable', popularity: 98,
+    text: `Once there was a little lantern that wanted to shine the brightest of all. It hung on a quiet street corner and watched the city pass by. Every evening, when the sky dimmed, the lantern would glow shyly. One night a storm swept through and many lamps were blown out. The little lantern remained, small but steadfast. A child found it, placed it in a window, and that tiny light became a beacon to travelers and neighbors alike. The lantern learned that being steady mattered more than being the brightest. From that night forward, its glow warmed many hearts.`
+  },
+  {
+    id: 's2', title: 'Midnight Train', author: 'R. Kapoor', genre: 'Drama', popularity: 79,
+    text: `The midnight train hummed along the tracks like a sleeping beast. Carla held a crumpled letter and watched the moon cut silver across her palm. Memories she had kept tucked away spilled out in a flood: laughter in a kitchen, the smell of rain on old stone, promises whispered by lamplight. At the next station a stranger boarded, settling into the seat opposite with tired eyes. They didn't speak at first. Sometimes journeys give people a little distance to breathe and the courage to begin again. When dawn broke, both passengers carried a new softness into the morning.`
+  },
+  {
+    id: 's3', title: 'The Clockmaker’s Secret', author: 'L. Mehta', genre: 'Mystery', popularity: 85,
+    text: `In a lane where time seemed to slip, an old clockmaker kept silent about the tiny key he hid behind a loose tile. He wound the clocks at dusk while the town slept, listening to the steady tick like a small army of heartbeats. Children told tales of his past as if it were a dream, and travelers admired the precision of his work. One curious apprentice discovered the key and learned the clockmaker's lonely truth: time can be mended, but it cannot be borrowed. The secret changed them both, not in wealth but in the slow repair of trust.`
+  },
+  {
+    id: 's4', title: 'Tea on the Terrace', author: 'A. Rao', genre: 'Slice of Life', popularity: 72,
+    text: `Morning invited itself in through the open window as Mira prepared two cups of tea. The city below was already forming its own stories — a vendor opening his stall, a child balancing a book and a bag. She set the cups on the terrace and welcomed a guest: an old friend who had returned from travels. They spoke of small things: the quality of light, a new recipe, the habit of pausing when things go fast. The cups cooled but conversation didn’t. Some reunions are gentle heals that need only time and a warm cup.`
+  }
+];
+
+/* -------------------------
+   App state and storage
+   ------------------------- */
+const state = {
+  current: null,        // current story object
+  sentences: [],        // sentences array
+  idx: 0,               // current sentence index
+  utterance: null,      // SpeechSynthesisUtterance
+  playing: false,
+  boundarySupported: false
+};
+
+const STORAGE_KEYS = {
+  bookmarks: 'storytime:bookmarks',
+  progress: 'storytime:progress' // object mapping id -> percent (0-100) and index
+};
+
+/* -------------------------
+   DOM refs
+   ------------------------- */
+const storyListEl = document.getElementById('storyList');
+const qEl = document.getElementById('q');
+const genreFilterEl = document.getElementById('genreFilter');
+const authorFilterEl = document.getElementById('authorFilter');
+const sortByEl = document.getElementById('sortBy');
+const clearSearchEl = document.getElementById('clearSearch');
+const textAreaEl = document.getElementById('textArea');
+const storyHeaderEl = document.getElementById('storyHeader');
+const storyMetaEl = document.getElementById('storyMeta');
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const bookmarkBtn = document.getElementById('bookmarkBtn');
+const speedEl = document.getElementById('speed');
+const volumeEl = document.getElementById('volume');
+const progressFill = document.getElementById('progressFill');
+const progressLabel = document.getElementById('progressLabel');
+const recommendationsEl = document.getElementById('recommendations');
+const themeToggle = document.getElementById('themeToggle');
+
+/* -------------------------
+   Utilities: storage
+   ------------------------- */
+function loadBookmarks(){ return JSON.parse(localStorage.getItem(STORAGE_KEYS.bookmarks) || '[]'); }
+function saveBookmarks(arr){ localStorage.setItem(STORAGE_KEYS.bookmarks, JSON.stringify(arr)); }
+function loadProgress(){ return JSON.parse(localStorage.getItem(STORAGE_KEYS.progress) || '{}'); }
+function saveProgress(obj){ localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify(obj)); }
+
+/* -------------------------
+   Build filters
+   ------------------------- */
+function populateFilters(){
+  const genres = [...new Set(stories.map(s=>s.genre))].sort();
+  const authors = [...new Set(stories.map(s=>s.author))].sort();
+  genres.forEach(g=>{ const o=document.createElement('option'); o.value=g; o.textContent=g; genreFilterEl.appendChild(o); });
+  authors.forEach(a=>{ const o=document.createElement('option'); o.value=a; o.textContent=a; authorFilterEl.appendChild(o); });
+}
+
+/* -------------------------
+   Render story list
+   ------------------------- */
+function renderList(){
+  const q = qEl.value.trim().toLowerCase();
+  const genre = genreFilterEl.value;
+  const author = authorFilterEl.value;
+  const sortBy = sortByEl.value;
+  let list = stories.filter(s=>{
+    if(genre && s.genre!==genre) return false;
+    if(author && s.author!==author) return false;
+    if(q && !(s.title.toLowerCase().includes(q) || s.author.toLowerCase().includes(q) || s.genre.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  if(sortBy==='pop') list.sort((a,b)=>b.popularity - a.popularity);
+  else list.sort((a,b)=> a.title.localeCompare(b.title));
+  storyListEl.innerHTML = '';
+  const bookmarks = loadBookmarks();
+  list.forEach(s=>{
+    const item = document.createElement('div'); item.className='story-item';
+    item.onclick = ()=> selectStory(s.id);
+    const avatar = document.createElement('div'); avatar.className='story-avatar';
+    avatar.style.background = (s.genre==='Mystery')? 'linear-gradient(90deg,#6f42c1,#1f8ef1)' : (s.genre==='Drama')? 'linear-gradient(90deg,#ff8fa3,#ff6b6b)' : 'linear-gradient(90deg,#ffd93d,#ffb86b)';
+    avatar.textContent = s.title.split(' ').map(t=>t[0]).slice(0,2).join('');
+    const meta = document.createElement('div'); meta.className='meta';
+    meta.innerHTML = `<div class="title">${s.title} <span class="small">by ${s.author}</span></div>
+                      <div class="small">${s.genre} • Popularity ${s.popularity} <span style="float:right">${bookmarks.includes(s.id)?'★':'☆'}</span></div>`;
+    item.appendChild(avatar); item.appendChild(meta);
+    storyListEl.appendChild(item);
+  });
+}
+
+/* -------------------------
+   Select story
+   ------------------------- */
+function selectStory(id){
+  const s = stories.find(x=>x.id===id);
+  if(!s) return;
+  state.current = s;
+  storyHeaderEl.innerHTML = `<strong>${s.title}</strong>`;
+  storyMetaEl.textContent = `${s.author} • ${s.genre} • Popularity ${s.popularity}`;
+  // split into sentences (simple heuristic)
+  state.sentences = s.text.match(/[^\.!\?]+[\.!\?]?/g) || [s.text];
+  state.idx = 0;
+  renderText();
+  updateBookmarkUI();
+  updateProgressUI();
+  renderRecommendations();
+}
+
+/* -------------------------
+   Render story text with sentence spans
+   ------------------------- */
+function renderText(){
+  if(!state.current){ textAreaEl.innerHTML = 'Choose a story from the left.'; return; }
+  const html = state.sentences.map((s,i)=>`<span class="sentence" data-idx="${i}">${s.trim()}</span>`).join(' ');
+  textAreaEl.innerHTML = html;
+  scrollToSentence(state.idx);
+}
+
+/* -------------------------
+   Highlighting & scrolling
+   ------------------------- */
+function highlightSentence(i){
+  const nodes = textAreaEl.querySelectorAll('.sentence');
+  nodes.forEach(n=>n.classList.remove('highlight'));
+  const el = textAreaEl.querySelector(`.sentence[data-idx="${i}"]`);
+  if(el) el.classList.add('highlight');
+  scrollToSentence(i);
+}
+function scrollToSentence(i){
+  const el = textAreaEl.querySelector(`.sentence[data-idx="${i}"]`);
+  if(!el) return;
+  // ensure visibility
+  const rect = el.getBoundingClientRect();
+  const parentRect = textAreaEl.getBoundingClientRect();
+  if(rect.top < parentRect.top || rect.bottom > parentRect.bottom){
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+}
+
+/* -------------------------
+   Speech / narration
+   ------------------------- */
+function stopSpeech(){
+  if(window.speechSynthesis){
+    window.speechSynthesis.cancel();
+  }
+  state.playing = false;
+  state.utterance = null;
+  playBtn.textContent = 'Play ▶';
+}
+function pauseSpeech(){
+  if(window.speechSynthesis && window.speechSynthesis.speaking){
+    if(window.speechSynthesis.paused) window.speechSynthesis.resume();
+    else window.speechSynthesis.pause();
+  }
+}
+function playFromIndex(startIdx = 0){
+  if(!state.current) return;
+  if(!('speechSynthesis' in window)){
+    alert('Your browser does not support SpeechSynthesis. Playback not available.');
+    return;
+  }
+  stopSpeech();
+  state.idx = startIdx;
+  const synth = window.speechSynthesis;
+  const progressData = loadProgress();
+  const utteranceQueue = []; // for chaining
+  // Build utterance for each sentence
+  for(let i = startIdx; i < state.sentences.length; i++){
+    const u = new SpeechSynthesisUtterance(state.sentences[i].trim());
+    u.rate = parseFloat(speedEl.value) || 1;
+    u.volume = parseFloat(volumeEl.value) || 1;
+    u.lang = 'en-US';
+    // attach index
+    u._idx = i;
+    // boundary detection (word-level), try to use onboundary
+    u.onboundary = function(e){
+      if(e.name === 'word' || e.name === 'sentence' || e.name === undefined){
+        // highlight sentence when first boundary arrives
+        highlightSentence(u._idx);
+      }
+    };
+    u.onstart = function(){ highlightSentence(u._idx); updateProgressByIndex(u._idx); };
+    u.onend = function(){
+      // when last utterance finishes, update progress
+      if(u._idx === state.sentences.length - 1){
+        updateProgressByIndex(state.sentences.length - 1, true);
+        state.playing = false;
+        playBtn.textContent = 'Play ▶';
+      }
+    };
+    utteranceQueue.push(u);
+  }
+
+  // fallback if onboundary not supported - detect after trying one utterance
+  // play them sequentially
+  (async function playSequential(){
+    state.playing = true;
+    playBtn.textContent = 'Playing...';
+    for(const u of utteranceQueue){
+      if(!state.playing) break; // stop pressed
+      // if boundary events are not firing in this browser for the first utterance, we implement a fallback
+      let firedBoundary = false;
+      const boundaryWatcher = (e) => { firedBoundary = true; };
+      u.onboundary = function(){ firedBoundary = true; highlightSentence(u._idx); updateProgressByIndex(u._idx); };
+      // speak and wait for end
+      synth.speak(u);
+      // Wait until end (promise with onend)
+      await new Promise(resolve=>{
+        u.onend = () => { resolve(); };
+        // fallback estimator: if boundary events never fired for this utterance after some time, approximate duration
+        setTimeout(()=>{
+          if(!firedBoundary){
+            // estimate duration via chars and rate. Words per minute roughly 180 WPM at rate 1 => ~3.3 words/sec.
+            const words = (u.text.match(/\S+/g)||[]).length;
+            const estSec = Math.max(0.6, words / (180 * u.rate / 60)); // simplistic
+            // still wait until speech finishes naturally if it will; but ensure progress updates while waiting:
+            // highlight immediately
+            highlightSentence(u._idx);
+            updateProgressByIndex(u._idx);
+          }
+        }, 180); // small delay
+      });
+    }
+    state.playing = false;
+    playBtn.textContent = 'Play ▶';
+  })();
+}
+
+/* -------------------------
+   Progress & Bookmark
+   ------------------------- */
+function updateProgressByIndex(idx, complete=false){
+  state.idx = idx;
+  const percent = Math.round(((idx+1)/state.sentences.length)*100);
+  const pObj = loadProgress();
+  pObj[state.current.id] = { idx: idx, percent: percent, lastUpdated: Date.now() };
+  saveProgress(pObj);
+  updateProgressUI(complete);
+}
+function updateProgressUI(complete=false){
+  if(!state.current) { progressFill.style.width='0%'; progressLabel.textContent='0%'; return; }
+  const p = loadProgress()[state.current.id] || {percent:0};
+  progressFill.style.width = (p.percent || 0) + '%';
+  progressLabel.textContent = (p.percent || 0) + '%';
+  // mark finished UI if 100%
+  if(p.percent >= 100 || complete){
+    progressLabel.textContent = 'Completed ✓';
+  }
+}
+function toggleBookmark(){
+  const arr = loadBookmarks();
+  if(!state.current) return;
+  if(arr.includes(state.current.id)){
+    const idx = arr.indexOf(state.current.id); arr.splice(idx,1);
+  } else {
+    arr.push(state.current.id);
+  }
+  saveBookmarks(arr);
+  updateBookmarkUI();
+  renderList();
+}
+function updateBookmarkUI(){
+  const arr = loadBookmarks();
+  if(!state.current) { bookmarkBtn.textContent='♡ Bookmark'; return; }
+  if(arr.includes(state.current.id)) bookmarkBtn.textContent = '★ Bookmarked';
+  else bookmarkBtn.textContent = '♡ Bookmark';
+}
+
+/* -------------------------
+   Recommendations (simple)
+   ------------------------- */
+function renderRecommendations(){
+  recommendationsEl.innerHTML = '';
+  if(!state.current) return;
+  // recommend top 2 in same genre excluding current
+  const rec = stories.filter(s=>s.genre === state.current.genre && s.id !== state.current.id)
+                     .sort((a,b)=>b.popularity - a.popularity)
+                     .slice(0,3);
+  if(rec.length === 0){
+    const alt = stories.filter(s=>s.id !== state.current.id).sort((a,b)=>b.popularity - a.popularity).slice(0,3);
+    alt.forEach(s=> addRecChip(s));
+  } else rec.forEach(s=> addRecChip(s));
+}
+function addRecChip(s){
+  const c = document.createElement('div'); c.className='chip'; c.textContent = `${s.title} • ${s.author}`;
+  c.onclick = ()=> selectStory(s.id);
+  recommendationsEl.appendChild(c);
+}
+
+/* -------------------------
+   Events
+   ------------------------- */
+qEl.addEventListener('input', renderList);
+clearSearchEl.addEventListener('click', ()=>{
+  qEl.value=''; genreFilterEl.value=''; authorFilterEl.value=''; sortByEl.value='pop'; renderList();
+});
+genreFilterEl.addEventListener('change', renderList);
+authorFilterEl.addEventListener('change', renderList);
+sortByEl.addEventListener('change', renderList);
+
+playBtn.addEventListener('click', ()=>{
+  if(!state.current) { alert('Select a story first.'); return; }
+  if(state.playing){
+    // pressing play when playing -> stop
+    stopSpeech();
+  } else {
+    playFromIndex(state.idx || 0);
+  }
+});
+pauseBtn.addEventListener('click', ()=>{
+  if(!state.current) return;
+  if(window.speechSynthesis){
+    if(window.speechSynthesis.speaking){
+      if(window.speechSynthesis.paused) { window.speechSynthesis.resume(); pauseBtn.textContent = 'Pause ⏸'; }
+      else { window.speechSynthesis.pause(); pauseBtn.textContent = 'Resume ▶'; }
+    }
+  }
+});
+stopBtn.addEventListener('click', ()=>{
+  stopSpeech();
+  state.idx = 0;
+  highlightSentence(0);
+});
+bookmarkBtn.addEventListener('click', toggleBookmark);
+speedEl.addEventListener('input', ()=>{ /* new speed applied on next utterance */ });
+volumeEl.addEventListener('input', ()=>{ /* new volume applied on next utterance */ });
+
+themeToggle.addEventListener('click', ()=>{
+  const cur = document.documentElement.getAttribute('data-theme');
+  if(cur==='dark'){ document.documentElement.removeAttribute('data-theme'); themeToggle.textContent='Dark'; }
+  else{ document.documentElement.setAttribute('data-theme','dark'); themeToggle.textContent='Light'; }
+});
+
+/* -------------------------
+   Initialization
+   ------------------------- */
+(function init(){
+  populateFilters();
+  renderList();
+  // optionally select first story
+  selectStory(stories[0].id);
+
+  // restore last progress highlight if any
+  const p = loadProgress();
+  if(p && p[stories[0].id]){ state.idx = p[stories[0].id].idx || 0; highlightSentence(state.idx); updateProgressUI(); }
+
+  // Detect boundary support roughly
+  // Create a temp utterance to test onboundary presence
+  if('speechSynthesis' in window){
+    try{
+      const test = new SpeechSynthesisUtterance('test');
+      test.onboundary = function(){ state.boundarySupported = true; };
+      // speak muted test quickly
+      test.volume = 0;
+      window.speechSynthesis.speak(test);
+      setTimeout(()=>{ /* no-op: our code handles fallback */ }, 200);
+    }catch(e){ /* ignore */ }
+  }
+})();
+</script>
+</body>
+</html>
